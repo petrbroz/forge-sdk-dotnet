@@ -1,0 +1,26 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+}
+
+#header {
+    position: absolute;
+    width: 100%;
+    height: 3em;
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+#header select {
+    margin-right: 1em;
+}
+
+#viewer {
+    position: absolute;
+    width: 100%;
+    height: calc(100% - 3em);
+    top: 3em;
+}
