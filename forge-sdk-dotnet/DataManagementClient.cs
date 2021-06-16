@@ -5,6 +5,8 @@ using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Autodesk.Forge
@@ -51,6 +53,31 @@ namespace Autodesk.Forge
             return buckets;
         }
 
+        public async Task<Bucket> CreateBucketAsync(string bucketKey, BucketRegion region = BucketRegion.US, BucketPolicy policy = BucketPolicy.Temporary, BucketAccess access = BucketAccess.Full)
+        {
+            var apiKey = ((OAuthTokenProvider)AccessTokenProvider).ClientID;
+
+            var payloaObj = new
+            {
+                bucketKey = bucketKey,
+                policyKey = policy.ToString().ToLower(),
+                premissions = new List<dynamic>()
+                {
+                    new { autId = apiKey, access = access.ToString().ToLower() }
+                }
+            };
+
+            var payload = JsonSerializer.Serialize(payloaObj);
+
+            using var stringContent = new StringContent(payload, Encoding.UTF8, "application/json");
+
+            var response = await PostAsync($"buckets?region={region.ToString()}", stringContent, BucketReadWriteAllScopes);
+
+            var returnValue = await response.Content.ReadFromJsonAsync<Bucket>();
+
+            return returnValue;
+        }
+
         public async IAsyncEnumerable<Object> EnumerateObjects(string bucketKey)
         {
             var uri = string.Format("buckets/{0}/objects", bucketKey);
@@ -89,20 +116,10 @@ namespace Autodesk.Forge
 
         public async Task<Object> UploadObjectAsync(string bucketKey, string objectKey, Stream stream)
         {
-            using HttpContent httpContent = new StreamContent(stream);
-            httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/stream");
-
-            var uri = $"buckets/{bucketKey}/objects/{objectKey}";
-
-            var response = await PutAsync(uri, httpContent, DataReadWriteAllScopes);
-            response.EnsureSuccessStatusCode();
-
-            var rObject = await response.Content.ReadFromJsonAsync<Object>();
-
-            return rObject;
+            return await UploadObjectAsync(bucketKey, objectKey, stream, 5);
         }
 
-        public async Task<Object> UploadObjectAsync(string bucketKey, string objectKey, Stream stream, int chunkSizeInMB = 5)
+        public async Task<Object> UploadObjectAsync(string bucketKey, string objectKey, Stream stream, int chunkSizeInMB)
         {
             Object returnValue = null;
 
@@ -150,7 +167,14 @@ namespace Autodesk.Forge
             }
             else
             {
-                returnValue = await UploadObjectAsync(bucketKey, objectKey, stream);
+                using HttpContent httpContent = new StreamContent(stream);
+                httpContent.Headers.ContentType = new MediaTypeHeaderValue("application/stream");
+
+                var uri = $"buckets/{bucketKey}/objects/{objectKey}";
+
+                var response = await PutAsync(uri, httpContent, DataReadWriteAllScopes);
+
+                returnValue = await response.Content.ReadFromJsonAsync<Object>();
             }
 
             return returnValue;
