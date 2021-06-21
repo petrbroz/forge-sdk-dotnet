@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Autodesk.Forge
 {
-    public class BaseClient
+    public class BaseClient : IDisposable
     {
         protected HttpClient Client { get; init; }
 
@@ -43,6 +43,30 @@ namespace Autodesk.Forge
             var response = await Client.SendAsync(request);
             response.EnsureSuccessStatusCode();
             return response;
+        }
+
+        protected async Task<HttpResponseMessage> PutAsync(string endpoint, HttpContent content, IEnumerable<string> scopes)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Put, endpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await AccessTokenProvider.GetToken(scopes));
+            request.Content = content;
+            var response = await Client.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+            return response;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Client?.Dispose();
+            }
         }
     }
 }
